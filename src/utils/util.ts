@@ -233,6 +233,7 @@ const createOnSearch = async (req: Request) => {
     }
     var locations: any = [];
     var items: any = [];
+    var fulfillments: any = [];
     for (var start_code of start_codes) {
         for (var end_code of end_codes) {
             if (start_code == end_code) {
@@ -250,8 +251,9 @@ const createOnSearch = async (req: Request) => {
                     const this_locations = await createLocationsArray(end_code);
                     locations = locations.concat(this_locations);
                 }
-                const this_items = await createItemsArray(start_code, end_code, fare, stop_times);
-                items = items.concat(this_items);
+                const {item,fulfillment_array} = await createItemsArray(start_code, end_code, fare, stop_times);
+                items.push(item);
+                fulfillments = fulfillments.concat(fulfillment_array);
             }
         }
     }
@@ -273,7 +275,8 @@ const createOnSearch = async (req: Request) => {
                             "name": "Kochi Metro Rail Limited"
                         },
                         "locations": locations,
-                        "items": items
+                        "items": items,
+                        "fulfillments": fulfillments
                     }
                 ]
             }
@@ -310,41 +313,46 @@ const createItemsArray = async (from: string, to: string, fare: any, stop_times:
     const currency_type = fare.currency_type;
     var from_schedule = [];
     var to_schedule = [];
+    const fulfillment_array = [];
     for (var time of stop_times) {
         from_schedule.push(time.arrival_time);
         to_schedule.push(time.destination_time);
+        const fulfillment = {
+            "id" : item_code,
+            "start": {
+                "location" : {
+                    "id": from
+                },
+                "time": {
+                    "timestamp": time.arrival_time
+                }
+            },
+            "end": {
+                "location" : {
+                    "id": to
+                },
+                "time": {
+                    "timestamp": time.destination_time
+                }
+            }
+        }; 
+        fulfillment_array.push(fulfillment);
     }
-    const item1 = {
-        "id": item_code,
-        "descriptor": {
-            "name": item_name
+    const item = {
+        "id": "sjt",
+        "descriptor" : {
+            "name" : "Single Journey Ticket",
+            "code" : "SJT"
         },
         "price": {
             "currency": currency_type,
             "value": price
         },
-        "stops": [
-            {
-                "id": from,
-                "time": {
-                    "schedule": {
-                        "times": from_schedule
-                    }
-                }
-            },
-            {
-                "id": to,
-                "time": {
-                    "schedule": {
-                        "times": to_schedule
-                    }
-                }
-            },
-        ],
         "location_id": from,
+        "fulfillment_id": item_code,
         "matched": true
     }
-    return ([item1]);
+    return ({item,fulfillment_array});
 }
 
 const createLocationsArray = async (code: string) => {
